@@ -1,0 +1,116 @@
+#!/bin/bash
+
+#Dossier dont il faut rajouter les droits en lecture
+#dossier_droit[0]="/home/jerep6/lamp/album/Vanessa"
+
+suffixe_petit="_120_cw120_ch120_thumb.jpg"
+suffixe_moyen="_700.jpg"
+
+#suffixe_petit="_298_cw298_ch178.jpg"
+#suffixe_moyen="_800.jpg"
+
+#PNG, JPG, JPEG, GIF (majuscule et minuscule)
+extension_img="[JjGgPn][PpIiNn][Ee]\{0,1\}[GgFf]"
+#AVI, MPG majuscule et minuscule)
+extension_vid="[AaMm][VvPp][IiGg4]"
+
+#############
+# Fonctions #
+############
+miniature() {
+        dossier=$1
+        for fichier in "$dossier"*
+        do
+                #Remplace le dossier_racine par le dossier_miniature dans le chemin du fichier
+                fichier_miniature=${fichier//$dossier_racine/$dossier_miniature};
+
+                # Si le fichier est un dossier => parcours de ce dossier
+                if [ -d "$fichier" ]; then
+                        #Création du dossier contenant les miniatures (s'il n'existe pas déjà)
+                        if [ ! -e "$fichier_miniature" ]; then
+                                mkdir "$fichier_miniature"
+                        fi
+
+                        #Génération miniature dans ce dossier
+                        miniature "$fichier/"
+                else
+                        #Récupération de l'extension du fichier
+                        dernier_elt "$fichier" "."
+
+                        #Remplace le .EXTENSION par rien
+                        base_nom_miniture=${fichier_miniature//".$last_elt"/""};
+
+                        #Img : création miniature ci-celle ci n'existe pas et à condition que le fichier soit une image
+                        if [ ! -e "$base_nom_miniture$suffixe_petit" ] && [ `expr "$last_elt" : $extension_img` -gt 0 ]; then
+                                echo "Miniaturisation de : $fichier ..." 
+                                convert "$fichier" -thumbnail 120x120^ -gravity center -extent 120x120 -auto-orient -quality 70 "$base_nom_miniture$suffixe_petit"
+                                convert "$fichier" -strip -adaptive-resize 700 -auto-orient -quality 60 "$base_nom_miniture$suffixe_moyen"
+
+                        #Vidéo : création video flash ci-celle ci n'existe pas et à condition que le fichier soit une vidéo
+                        elif [ ! -e "$base_nom_miniture.flv" ] && [ `expr "$last_elt" : $extension_vid` -gt 0 ]; then
+                                echo "Conversion en flv de : $fichier"
+                                ffmpeg -i "$fichier" -acodec libmp3lame -ar 44100 -b:v 400k -b:a 64k -y "$base_nom_miniture.flv"
+                        fi
+
+                        #Vidéo : création du lien symbolique
+                        if [ `expr "$last_elt" : $extension_vid` -gt 0 ]; then
+                            #Lien dans le dossier original de l'album photo pour que zenphoto voit la vidéo. Le lien sera détruit après chaque rsync
+                            #c'est pour celà que cette action bénéficie d'une condition à part. Re-création du lien à chaque fois
+                            dossier_lien="`dirname "$fichier"`"
+                            echo "Lien vers $dossier_lien"
+                            ln -s "$base_nom_miniture.flv" "$dossier_lien"
+                        fi
+
+                fi
+        done
+}
+
+#La variable last_elt contient le dernier elmt de la chaine $1 explodée selon l'argument $2
+#On peut pas retourner quelque chose de plus complexe qu'un nbre; il faut utiliser un effet de bord:
+#récupérer dans le script la valeur de la variable dernier
+# param1 chaine
+# param2 séparateur
+dernier_elt() {
+        #Modifie le séparateur
+        OLDIFS=$IFS
+        IFS=$2
+        chaine=$1
+        for i in $chaine 
+          do
+          last_elt=$i
+        done
+
+        IFS=$OLDIFS
+        #return $dernier #pas possible car retour de nbre uniquement
+}
+
+droits() { 
+  dossiers=$1
+  #Parcours du tableau dossiers changer les droits
+  for elt in "${dossiers[@]}"; do 
+    echo $elt;
+    chmod -R +x "$elt"
+  done
+}
+
+##### Recup arguments ######
+
+#Si un argument manquant termine le programme
+if [ -z "$1" -o -z "$2" ]; then
+     echo "Pas d'argument"
+     exit
+fi
+
+#Affectation des variables relatives aux dossiers
+#Les chemins doivent être absolus pour les liens symboliques (partie vidéo)
+dossier_racine="$1"
+dossier_miniature="$2"
+
+miniature $dossier_racine
+
+#Ajout des droits de lecture pour que apache puisse lire les fichiers
+if [ -n "$dossier_droit" ]; then
+      droits $dossier_droit
+fi
+
+exit 0

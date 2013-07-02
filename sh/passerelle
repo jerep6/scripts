@@ -1,0 +1,51 @@
+#/bin/bash
+
+passerelle_start() {
+	iptables -t nat -F
+	iptables -t nat -X
+	iptables -t nat -P PREROUTING ACCEPT
+	iptables -t nat -P POSTROUTING ACCEPT
+	iptables -t nat -P OUTPUT ACCEPT
+
+	echo "[ip forward]"
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	
+	########### LE MASQUERADING ################
+	echo "[Mise en place du masquerading]"
+	iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+}
+
+passerelle_stop() {
+	iptables -t nat -F
+	iptables -t nat -X
+	iptables -t nat -P PREROUTING ACCEPT
+	iptables -t nat -P POSTROUTING ACCEPT
+	iptables -t nat -P OUTPUT ACCEPT
+	
+	echo " [firewall desactivee ! ]"
+}
+
+passerelle_restart() {
+        passerelle_stop
+        sleep 2
+        passerelle_start
+}
+
+case "$1" in
+        'start')
+                passerelle_start
+        ;;
+        'stop')
+                passerelle_stop
+        ;;
+        'restart')
+                passerelle_restart
+        ;;
+        'status')
+                iptables -L
+                iptables -t nat -L
+                iptables -t mangle -L
+        ;;
+        *)
+                echo "Usage: passerelle {start|stop|restart|status}"
+esac

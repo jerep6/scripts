@@ -1,0 +1,40 @@
+#!/bin/bash
+
+#eval `ssh-agent`
+#ssh-add
+
+#Détourne le signal SIGINT
+trap 'echo Control-C exit ...; exit 1' INT
+
+#Répertoire où sont stockés les fichiers sur le serveur
+repertoireRsync="/mnt/donnees2/Jeremy/"
+
+#Adresse du serveur
+serveur="acimflo.no-ip.org"
+#serveur="192.168.1.7"
+
+#Utilisateur ssh du serveur
+utilisateur="diaporama"
+
+
+#Option de rsync
+RSYNC_OPTS_GENERALES="-av --delete --exclude-from $(dirname $0)/exclude.rsync"
+RSYNC_OPTS_SSH="ssh -p 443 -i /home/jerep6/.ssh/id_dsa"
+
+
+#Tableau contenant le chemin des dossiers (sur mon ordinateur) à synchroniser
+#synchroSource[1]="/mnt/sda8/Perso/Photos/Appartement"
+#synchroSource[2]="/mnt/sda8/Perso/Photos/Famille"
+synchroSource[1]="/mnt/donnees/Perso"
+
+#Tableau contenant le chemin des dossiers (sur le serveur)
+#synchroDest[1]=$repertoireRsync"Photos/"
+#synchroDest[2]=$repertoireRsync"Photos/"
+synchroDest[1]=$repertoireRsync
+
+
+#Parcours du tableau synchroSource pour uploader les dossiers
+for index in "${!synchroSource[@]}"; do 
+	echo ${synchroSource[$index]} "==>" ${synchroDest[$index]};
+    rsync $RSYNC_OPTS_GENERALES -e "$RSYNC_OPTS_SSH" ${synchroSource[$index]} $utilisateur@$serveur:${synchroDest[$index]}
+done

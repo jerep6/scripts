@@ -1,0 +1,33 @@
+#!/bin/bash
+
+#eval `ssh-agent`
+#ssh-add
+
+#Détourne le signal SIGINT
+trap 'echo Control-C exit ...; exit 1' INT
+
+#Répertoire où sont stockés les fichiers sur le serveur
+repertoireDistantLogin="/mnt/donnees/Agence/Login/"
+
+
+#Adresse du serveur
+serveur="acimfloagence.dyndns.org"
+#Utilisateur ssh du serveur
+utilisateur="acimflo"
+
+#Récupère le seul argument autorisé et obligatoire qui est le chemin de sauvegarde
+if [ -n "$1" ]; then
+     #Répertoire où seront stokés les fichiers à répurérer
+     repertoireSauvegarde=$1
+     echo $repertoireSauvegarde
+     
+     #repertoireSauvegarde=$1/`date +%Y-%m-%d`
+     #Création du répertoire
+     #mkdir -p $repertoireSauvegarde
+     
+     rsync -rlptDvv --delete --stats -e "ssh -p 443" $utilisateur@$serveur:${repertoireDistantLogin} ${repertoireSauvegarde}
+else
+     echo "Erreur : Aucun répertoire de sauvegarde (en argument) n'est précisé."
+fi
+
+

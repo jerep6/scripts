@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Exemple d'utilisation
+#crypt mount /dev/sdb1 /mnt/donnees/
+#crypt umount /mnt/donnees/
+
+
+monter_partition() {
+	if [ -z "$1" -o -z "$2" ]; then
+		echo "Il manque au moins un argument"
+		exit 1
+	fi
+
+	mapper_name=`basename $2`
+	mount_point=$2
+
+
+	# on verifie que le disque chiffré est detecte
+	if test ! -b $1; then
+		echo "$1 non detecte"
+
+	# on verifie qu`elle contient bien une partition LUKS
+	elif ! cryptsetup isLuks $1; then
+		echo -n "Aucune partition LUKS"
+
+	# Vérifie que le mapper n'est pas déjà monté. Si
+	elif ! mount | grep -q "/dev/mapper/$mapper_name"; then
+
+		# On test si la creation du luks mapping et du montage n`a pas ete déjà effectué
+		if test ! -b /dev/mapper/$mapper_name; then
+			echo -n "$mapper_name ==> "
+			if cryptsetup luksOpen $1 $mapper_name; then
+				echo "Ouverture de la partition LUKS et creation du luks mapping /dev/mapper/$mapper_name"
+			fi
+		fi
+		if ! mount | grep -q "$mount_point"; then
+			if mount /dev/mapper/$mapper_name "$mount_point"; then
+				echo "Montage de $1 effectue dans $mount_point"
+			fi
+		fi
+	fi
+}
+
+demonter_partition() {
+	mapper_name=`basename $1`
+	#Supprime le / à la fin du point de montage car la commande mount renvoie les chemin sans slash
+	mount_point=${1%/}
+
+	if [ -z "$mount_point" ]; then
+		echo "Point de montage non renseigné"
+		exit 1
+	fi
+
+	# Si le point de montage est monté => démontage
+	if mount | grep -q "$mount_point"; then
+		if lsof "$mount_point"; then
+			echo "$mount_point occupe - demontage impossible"
+		else
+			if umount $mount_point; then
+				echo "Demontage de $mount_point effectue"
+			fi
+		fi
+	fi
+	# Fermeture de la partition LUKS
+	if cryptsetup luksClose $mapper_name; then
+		echo "Fermeture de la partition LUKS et suppression du luks mapping /dev/mapper/$mapper_name"
+	fi
+}
+
+case "$1" in
+        'mount')
+                monter_partition $2 $3
+        ;;
+        'umount')
+                demonter_partition $2 $3
+        ;;
+        *)
+                echo "Usage: crypt {mount peripherique point_montage | umount point_montage}"
+esac

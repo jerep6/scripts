@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# Réduit la qualité des photos pour gagner de la place sur le disque dur
+# et réoriente les photos (options -auto-orient de mogrify)
+# La qualité sera réduite uniquement dans le cas où la qualité de la photo
+# et supérieure à la qualité voulue
+
+##################################################################
+#			FONCTIONS
+##################################################################
+
+#Affiche les options disponibles
+aide() {
+    echo "$0 [options] dossiers"
+    echo "-k 	(keep) conserve la date des fichiers"
+    echo "-h	affiche ce message"
+    echo "-R	traitement récursif des dossiers"
+    echo "-q X	X étant la qualité en pourcentage des photos"
+}
+
+
+#Traite un dossier passé en paramètre
+#param1	=> fichier (ou dossier)
+#param2	=> nbre indiquant le niveau de profondeur dans l'arborescence (0=1er appel donc on traite les dossiers même
+#			si pas option récursif
+traiter() {
+	#Si le fichier est un dossier et que recursif 
+	#ou						=> parcours de ses fichiers pour effectuer le traitement
+	#param2 = 0 (1er niveau dans l'arborescence)
+
+	if [ -d "$1" -a -n "$recursif" -o -d "$1" -a $2 -eq 0 ]; then
+		for fichier in "$1"/*
+		do
+		    i=$2
+		    let "i += 1"
+		    traiter "$fichier" $i
+		done
+	
+	else
+	    #Type mime du fichier pour tester si c'est une img
+	    mime=`file -i "$1" | awk -F ": " '{print $2}' | awk -F ";" '{print $1}'`
+
+	    if [ "$mime" = "image/jpeg" ]; then
+            eval `identify -format "qualite=%Q\ndimensions=%wx%h" "$1"`
+            #echo "$1 => $qualite $dimensions"
+            #Si image JPEG et que qualite > qualite_min (img de qualité suffisante, on peut reduire sa qualité)
+            if [ $qualite -gt $qualite_min ]; then
+                echo "$1 ..."
+
+                if [ $keepDateModif -eq 1 ]; then
+                    #Avant de modifier l'img récupère sa date
+                    dateImg=`stat --format="%y" "$1"`                       #2010-05-10 08:23:22.000000000 +0200
+                    partie1=`echo $dateImg | cut -d\  -f1`                  #2010-05-10
+                    partie2=`echo $dateImg | cut -d\  -f2 | cut -d. -f1`    #08:23:22
+                    
+                    #Supprime les "-"
+                    a=`echo $partie1 | tr -d -`                             #20100510
+                    #Supprime les :
+                    b=`echo $partie2 | tr -d :`                             #082322
+                    dateImg=$a$b                                            #20100510082322
+                fi
+
+                mogrify -adaptive-resize $dimensions -quality $qualite_min -auto-orient "$1"
+
+                if [ $keepDateModif -eq 1 ]; then
+                    #Remet la date d'origine du fichier. Format attendu par touch = YYMMDDhhmm.ss
+                    touch -t ${dateImg:0:12}.${dateImg:12:2} "$1"
+                fi
+            fi
+	    fi
+	fi
+}
+
+
+
+qualite_min="80"	#Qualité des photos (les img ayant une qualité < ne seront pas touchées)
+recursif=""		    #La présence d'un caractere dans cette variable indique que cette option est activée
+keepDateModif=0    #En bash 0=false et 1=true. Donc par defaut, la réduction de qualité modifie la date du fichier
+
+##### Recup arguments ######
+index=0;
+while [ -n "$1" ]; do
+	case $1 in
+		-k)	keepDateModif=1
+			;;
+		-h) aide
+			exit
+			;;
+		-R)	recursif=1
+			;;
+		-q) qualite_min=$2
+			shift
+			;;
+		*)	
+			#Si fichier existe (l'utilisateur peut directement passer une photo en paramètre) alors ajout au tableau des fichiers à traiter
+			if [ -e "$1" ]; then
+				fichiers[$index]="$1"
+				let "index += 1"
+			fi
+			;;
+	esac
+	shift
+done
+
+#Message d'avertissement. L'utilisateur doit donner son accord pour continuer
+# L'option -n1 pour un seul caractère et -p pour le prompt
+read -p "Attention, les images seront altérées (Qualite=$qualite_min). Continuer [o/n] ? " reponse
+
+# Les guillemets autour de $reponse évitent une erreur si l'utilisateur appuie sur entrée sans avoir entré de lettre
+if [ "$reponse" != "o" ]; then
+	exit
+fi
+echo
+
+#Pour chaque dossier => parcours des fichiers
+for unFichier in "${fichiers[@]}"; do
+	traiter "$unFichier" 0
+done

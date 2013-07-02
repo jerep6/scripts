@@ -1,0 +1,17 @@
+#!/bin/bash
+
+
+t() {
+    for fichier in "$1"*
+        do
+            #Si le fichier est un dossier => parcours de ce dossier
+            if [ -d "$fichier" ]; then            
+                touch -t $2 "$fichier"
+                t "$fichier/" $2
+            else
+                touch -t $2 "$fichier"
+            fi
+    done
+}
+
+t $1 $2

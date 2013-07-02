@@ -1,0 +1,3 @@
+#exclude.rsync
+.svn
+.git

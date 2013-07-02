@@ -1,0 +1,43 @@
+#!/bin/bash
+
+#Détourne le signal SIGINT
+trap 'echo Control-C exit ...; exit 1' INT
+
+#Répertoire où sont stockés les fichiers sur le serveur distant
+repertoireRsync="/mnt/donnees/"
+
+#Adresse du serveur
+serveur="jerep6.dyndns.org"
+serveur="192.168.1.8"
+
+#Utilisateur ssh du serveur
+utilisateur="diaporama"
+
+#Option de rsync
+RSYNC_OPTS_GENERALES="-av --delete --exclude-from $(dirname $0)/exclude.rsync"
+RSYNC_OPTS_SSH="ssh -p 22 -i /home/jerep6/.ssh/rsync.priv"
+
+
+
+################# DOSSIERS #################
+#synchroSource = Tableau contenant le chemin des dossiers de l'agence à synchroniser
+#synchroDest = Tableau contenant le chemin des dossiers (sur le serveur)
+synchroSource[1]="/mnt/Agence/Accueil"
+synchroDest[1]=$repertoireRsync"Agence/"
+
+synchroSource[2]="/mnt/Agence/Login"
+synchroDest[2]=$repertoireRsync"Agence/"
+
+#Florence est crypté. Vérifie qu'il est bien monté avant de le synchroniser
+if [ -n "`mount | grep "Florence"`" ]; then
+    synchroSource[3]="/mnt/Florence/"
+    synchroDest[3]=$repertoireRsync"Florence/"
+fi
+
+
+################# TRAITEMENT #################
+#Parcours du tableau synchroSource pour uploader les dossiers
+for index in "${!synchroSource[@]}"; do 
+    echo ${synchroSource[$index]} "==>" ${synchroDest[$index]}; 
+    rsync $RSYNC_OPTS_GENERALES -e "$RSYNC_OPTS_SSH" ${synchroSource[$index]} $utilisateur@$serveur:${synchroDest[$index]} 
+done
