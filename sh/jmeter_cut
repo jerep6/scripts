@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [[ -z "$1" || -z "$2" || -z "$3" ]]; then
+        echo "Il manque des arguments"
+	echo "Argument 1 : fichier a decouper"
+	echo "Argument 2 : date de debut au format YYYY-MM-DD HH:MM:SS"
+	echo "Argument 3 : date de fin au format YYYY-MM-DD HH:MM:SS"
+        exit
+fi
+
+fichier=$1
+echo $2
+
+nom_fichier=$(basename "$fichier")
+timestamp_debut=$(date -d "$2" +%s | cut -c1-8)
+timestamp_fin=$(date -d "$3" +%s | cut -c1-8)
+
+echo "Timestamp debut = $timestamp_debut"
+echo "Timestamp fin = $timestamp_fin"
+
+numero_ligne_debut=$(grep -n $timestamp_debut $fichier | head -1 | cut -d':' -f1)
+numero_ligne_fin=$(grep -n $timestamp_fin $fichier | tail -1 | cut -d':' -f1)
+
+if [[ -z $numero_ligne_debut ]]; then
+	echo "Timestamp debut non trouve. Premiere ligne par defaut"
+	numero_ligne_debut=1
+fi
+if [[ -z $numero_ligne_fin ]]; then
+	echo "Timestamp fin non trouve. Derniere ligne par defaut"
+	numero_ligne_fin=$(wc -l "$fichier" | cut -d' ' -f1)
+fi
+
+echo "Ligne debut = $numero_ligne_debut"
+echo "Ligne fin = $numero_ligne_fin"
+
+sed -n "${numero_ligne_debut},${numero_ligne_fin}p" $fichier > "${nom_fichier}_${2//\:/-} to ${3//\:/-}.csv"

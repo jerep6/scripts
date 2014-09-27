@@ -1,0 +1,45 @@
+#!/bin/bash
+DEBUT_FICHIER="tri_"
+PATTERN_TO_EXCLUDE="palier"
+
+#Si un argument manquant termine le programme
+if [[ -z "$1" || -z "$2" ]]; then
+        echo "Il manque un argument"
+        echo "Argument 1 : dossier contenant les csv a traiter"
+        echo "Argument 2 : fichier contenant les paliers pour la decoupe"
+        exit
+fi
+
+dossier=$1
+fichier_palier=$2
+
+
+for fichier in "$dossier/"*
+do
+        #Récupération du nom du fichie
+        nom_fichier=$(basename "$fichier")
+	echo "Fichier courant $nom_fichier"
+
+	#Ne traite pas les fichier de sortie (tri_*) ni le fichier de palier
+        if [[ $nom_fichier != $DEBUT_FICHIER* &&  $nom_fichier != ${PATTERN_TO_EXCLUDE}* ]]; then
+                echo "Traitement fichier $fichier"
+		fichier_tri_nom="$DEBUT_FICHIER$nom_fichier"
+
+		#Tri des lignes du fichier par ordre croissant selon le timestamp jmeter
+                sort -n "$fichier" > "$fichier_tri_nom"
+
+		# split le fichier trier en fonction des informations palier
+		while read -r line
+			do
+				date_debut=$(echo $line | cut -d' ' -f1,2)
+				date_fin=$(echo $line | cut -d' ' -f3,4)
+			    
+				jmeter_cut $fichier_tri_nom "$date_debut" "$date_fin"
+		echo ""
+		done < "$fichier_palier"
+	fi
+done
+
+#Compte le nombre d'occurence d'un certain pattern pour determiner le nombre de page vues
+grep -c -e "_0[0-1]_ACCUEIL" -e "01_LOGIN" tri_*.csv_* > hits.txt
+echo "Fin"
